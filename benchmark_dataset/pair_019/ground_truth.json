@@ -1,0 +1,15 @@
+{
+  "style": "finfet",
+  "true_center_x": 433.22928987314526,
+  "true_center_y": 530.3768071559779,
+  "center_nm_x": 4332.292898731453,
+  "center_nm_y": 5303.768071559779,
+  "search_fov_nm": 10000.0,
+  "ref_fov_nm": 1000.0,
+  "pure_periodic": true,
+  "noise_multiplier": 1.0,
+  "scale_ratio": 10.0,
+  "pair_id": 19,
+  "reference_path": "E:\\Drift Sense\\benchmark_dataset\\pair_019\\reference.png",
+  "search_path": "E:\\Drift Sense\\benchmark_dataset\\pair_019\\search.png"
+}

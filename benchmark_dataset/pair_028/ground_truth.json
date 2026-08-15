@@ -1,0 +1,15 @@
+{
+  "style": "dram",
+  "true_center_x": 431.76264590545105,
+  "true_center_y": 447.2654766794185,
+  "center_nm_x": 4317.626459054511,
+  "center_nm_y": 4472.654766794185,
+  "search_fov_nm": 10000.0,
+  "ref_fov_nm": 1000.0,
+  "pure_periodic": false,
+  "noise_multiplier": 1.0,
+  "scale_ratio": 10.0,
+  "pair_id": 28,
+  "reference_path": "E:\\Drift Sense\\benchmark_dataset\\pair_028\\reference.png",
+  "search_path": "E:\\Drift Sense\\benchmark_dataset\\pair_028\\search.png"
+}
