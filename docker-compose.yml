@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    volumes:
+      # Mount results and datasets so outputs are saved back to the host machine
+      - ./results:/app/results
+      - ./benchmark_dataset:/app/benchmark_dataset
+    # Default command is evaluate_benchmarks.py, but you can override it:
+    # command: python dataset_generator.py --num_pairs 10
