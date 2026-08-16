@@ -50,6 +50,11 @@ def evaluate_dataset(dataset_dir="./benchmark_dataset", output_dir="./results"):
     for item in manifest:
         ref_path = item["reference_path"]
         search_path = item["search_path"]
+        
+        if not os.path.isabs(ref_path):
+            ref_path = os.path.join(dataset_dir, ref_path)
+        if not os.path.isabs(search_path):
+            search_path = os.path.join(dataset_dir, search_path)
         gt_x = item["true_center_x"]
         gt_y = item["true_center_y"]
         style = item.get("style", "unknown")
