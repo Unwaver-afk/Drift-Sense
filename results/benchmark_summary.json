@@ -1,11 +1,11 @@
 {
-  "total_pairs_evaluated": 30,
-  "standard_cases_count": 27,
-  "periodic_stress_cases_count": 3,
-  "standard_cases_subpixel_accuracy_pct": 14.81,
-  "standard_cases_1px_accuracy_pct": 14.81,
-  "standard_cases_mae_pixels": 108.6162,
-  "standard_cases_mae_nanometers": 1086.16,
-  "mean_latency_ms": 26.41,
-  "p95_latency_ms": 100.68
+  "total_pairs_evaluated": 1000,
+  "standard_cases_count": 769,
+  "periodic_stress_cases_count": 231,
+  "standard_cases_subpixel_accuracy_pct": 4.29,
+  "standard_cases_1px_accuracy_pct": 5.2,
+  "standard_cases_mae_pixels": 244.9799,
+  "standard_cases_mae_nanometers": 2449.8,
+  "mean_latency_ms": 17.99,
+  "p95_latency_ms": 35.8
 }

@@ -7,7 +7,7 @@ sense-amp gaps, power mesh) and optional controlled imperfections.
 
 Structural references:
     IRDS 2022/2023 — IEEE IRDS Metrology & Memory Working Group
-    Typical advanced DRAM: 30–50 nm bitline pitch, 45–75 nm wordline pitch
+    Typical advanced DRAM: 30-50 nm bitline pitch, 45-75 nm wordline pitch
 """
 
 from __future__ import annotations
