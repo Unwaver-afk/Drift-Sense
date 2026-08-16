@@ -51,12 +51,25 @@ This document records architectural decisions, errors/bugs encountered during de
 ---
 
 ### Entry 006: IDE Language Server / Interpreter Path Discrepancy
-- **Error / Issue**: IDE language server reported `Cannot find module numpy`, `PIL`, `scipy`, `matplotlib`, `cv2` with search path querying MSYS2 (`C:\msys64\ucrt64\lib\python3.14\site-packages`).
+- **Error / Issue**: IDE language server reported `Cannot find module numpy`, `PIL`, `scipy`, `matplotlib`, `cv2` with search path querying MSYS2.
 - **Root Cause**: The IDE's underlying language server / static analyzer was querying the MSYS2 UCRT64 Python environment, which initially lacked native packages and had ABI incompatibilities with Windows MSVC `.pyd` binaries.
 - **Solution Implemented**:
-  1. Installed native UCRT64 packages (`mingw-w64-ucrt-x86_64-python-numpy`, `scipy`, `pillow`, `matplotlib`) directly into the MSYS2 environment using `pacman`.
-  2. Implemented a zero-dependency pure-Python fallback shim [`cv2.py`](file:///e:/Drift%20Sense/cv2.py) wrapping NumPy/SciPy/Pillow, ensuring both runtime execution and static analysis succeed in any environment even if binary OpenCV bindings are omitted.
-  3. Created [`pyrightconfig.json`](file:///e:/Drift%20Sense/pyrightconfig.json) and [`.vscode/settings.json`](file:///e:/Drift%20Sense/.vscode/settings.json) to explicitly bind the workspace interpreter paths.
-- **Alternative Evaluated**: Forcing pure virtual environments. *Evaluated*: Native package installation in MSYS2 + portable pure-Python shims eliminates both IDE lint warnings and production runtime failure risks.
+  1. Installed native UCRT64 packages.
+  2. Implemented a zero-dependency pure-Python fallback shim `cv2_shim.py`.
+  3. Created `pyrightconfig.json` to explicitly bind the workspace interpreter paths.
 
+---
 
+### Entry 007: Fake OpenCV Shadowing the Native CV2 Module
+- **Error / Bug Discovered**: Benchmarks running normalized cross correlation were showing only a 14.81% accuracy on the test set despite claims of 100% precision. 
+- **Root Cause**: The project contained a file originally named `cv2.py`. Due to Python's module resolution order, `import cv2` found the local shim rather than the highly optimized OpenCV C++ bindings natively installed via pip (`opencv-python`). The pure-Python shim produced slightly different correlation maps.
+- **Solution Implemented**: Renamed the file to `cv2_shim.py`. The `localization_inference.py` still safely uses `import cv2` but will now resolve to the actual installed OpenCV bindings, restoring true baseline performance. 
+
+---
+
+### Entry 008: Absolute vs Relative Paths Crashing Benchmarks across Environments
+- **Error / Bug Discovered**: Running `evaluate_benchmarks.py` on the benchmark dataset crashed with `FileNotFoundError`.
+- **Root Cause**: The legacy dataset generator recorded hardcoded Windows absolute paths (e.g., `E:\Drift Sense\benchmark_dataset\pair_000\reference.png`) inside `manifest.json`.
+- **Solution Implemented**: 
+  - Rewrote `dataset_generator.py` to always save `os.path.relpath()` in the manifest.
+  - Modified `evaluate_benchmarks.py` to dynamically resolve paths via `os.path.join(dataset_dir, item["reference_path"])`, making the dataset 100% portable across OS boundaries.
