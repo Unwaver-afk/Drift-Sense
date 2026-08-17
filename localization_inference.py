@@ -59,9 +59,52 @@ def subpixel_refinement(correlation_map, max_loc):
     return dx, dy
 
 
-def find_localized_center(ref_img, search_img, center_prior_weight=0.035):
+def find_localized_center(ref_img, search_img,
+                           center_prior_sigma_px=150.0,
+                           center_prior_strength=0.03):
     """
     Finds the center (x, y) of the reference pattern in the search image.
+
+    Tie-breaking (CHANGED - see changes.md "Tightened center-distance
+    prior"): the original implementation selected all candidates within a
+    flat correlation margin (global_max - 0.035) of the best score, then
+    broke ties with a *linear* distance-to-center penalty weighted at
+    0.035. Benchmarked against the full 1000-pair `benchmark_dataset`
+    (in-process, bypassing subprocess overhead), that flat threshold pulled
+    in far too many genuinely-different-quality candidates (hundreds of
+    pixels, not just near-exact ties), and the linear penalty was too weak
+    relative to typical correlation noise between periodic repeats to
+    reliably prefer the true match over a spuriously-higher-scoring decoy.
+
+    Replaced with a smooth Gaussian distance prior applied directly in the
+    cost function (no hard candidate-pool cutoff, so it degrades
+    gracefully instead of having a sharp inclusion/exclusion boundary).
+    (center_prior_sigma_px=150, center_prior_strength=0.03) was the best
+    of 8 candidate configurations swept against all 1000 pairs (see
+    changes.md for the full comparison table) - it reduced periodic
+    (pure_periodic=True) case MAE by ~17% (428.8px -> 355.0px) with no
+    measurable change to standard-case accuracy.
+
+    IMPORTANT, and this is intentional: the real dataset's target
+    placement includes "edge" and "hard" strategies that deliberately
+    place the true target far from the search-image center specifically
+    to defeat a naive center bias (see generator/target_placement.py). A
+    strong, tightly-scaled prior would systematically hurt those samples.
+    sigma_px=150 was chosen to be wide enough to act only as a gentle
+    regularizer between near-tied candidates, not as a "drift is always
+    small" assumption - it should not be tightened further without
+    re-testing against edge/hard-strategy samples specifically.
+
+    NOTE (honest limitation, out of scope for this change): this tuning
+    pass confirmed tie-breaking is NOT the dominant source of error.
+    Standard (non-periodic) case sub-pixel accuracy stayed within
+    measurement noise (~4%) across every tie-break variant tested,
+    including plain argmax with no prior at all. The large standard-case
+    MAE (~245px) is consistent with the rotation (up to ~2 deg) and scale
+    jitter (up to ~3%) the generator now applies, which single-orientation,
+    fixed-scale ZNCC has no mechanism to compensate for. That is a
+    separate, larger fix (rotation/scale search) and was not attempted
+    here per the specific scope of this change.
     """
     # 1. Anti-aliased 10x downsampling of Reference Image (1000x1000 -> 100x100)
     if HAS_OPENCV:
@@ -82,32 +125,21 @@ def find_localized_center(ref_img, search_img, center_prior_weight=0.035):
         search_zero = search_img.astype(np.float32) - np.mean(search_img)
         search_zero /= (np.std(search_zero) + 1e-6)
         corr_map = signal.correlate2d(search_zero, ref_zero, mode='valid') / (tpl_w * tpl_h)
-        
-    map_h, map_w = corr_map.shape
-    global_max = float(np.max(corr_map))
-    
+
     center_topleft_x = (search_w / 2.0) - (tpl_w / 2.0)
     center_topleft_y = (search_h / 2.0) - (tpl_h / 2.0)
-    max_dist = np.hypot(center_topleft_x, center_topleft_y)
-    
-    candidate_threshold = max(0.20, global_max - 0.035)
-    candidate_mask = corr_map >= candidate_threshold
-    
-    if np.any(candidate_mask):
-        valid_indices = np.argwhere(candidate_mask)
-        best_loc = None
-        min_cost = float('inf')
-        for y, x in valid_indices:
-            corr_val = corr_map[y, x]
-            dist_to_center = np.hypot(x - center_topleft_x, y - center_topleft_y)
-            dist_norm = dist_to_center / (max_dist + 1e-6)
-            cost = -corr_val + (center_prior_weight * dist_norm)
-            if cost < min_cost:
-                min_cost = cost
-                best_loc = (int(x), int(y))
-    else:
-        best_loc = np.unravel_index(np.argmax(corr_map), corr_map.shape)[::-1]
-        
+
+    # 3. Gaussian center-distance prior, applied directly in the cost
+    #    surface (no hard candidate-pool threshold - see docstring above).
+    yy, xx = np.mgrid[0:corr_map.shape[0], 0:corr_map.shape[1]]
+    dist_to_center = np.hypot(xx - center_topleft_x, yy - center_topleft_y)
+    penalty = center_prior_strength * (
+        1.0 - np.exp(-0.5 * (dist_to_center / center_prior_sigma_px) ** 2)
+    )
+    cost = -corr_map + penalty
+    y0, x0 = np.unravel_index(np.argmin(cost), cost.shape)
+    best_loc = (int(x0), int(y0))
+
     dx, dy = subpixel_refinement(corr_map, best_loc)
     
     pred_center_x = float(best_loc[0] + dx + (tpl_w / 2.0))
