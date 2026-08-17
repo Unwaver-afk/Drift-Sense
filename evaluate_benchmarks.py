@@ -39,6 +39,7 @@ def evaluate_dataset(dataset_dir="./benchmark_dataset", output_dir="./results"):
         
     results = []
     times = []
+    errors = []
     
     best_case = None
     worst_case = None
@@ -57,16 +58,22 @@ def evaluate_dataset(dataset_dir="./benchmark_dataset", output_dir="./results"):
             search_path = os.path.join(dataset_dir, search_path)
         gt_x = item["true_center_x"]
         gt_y = item["true_center_y"]
-        style = item.get("style", "unknown")
+        style = item.get("architecture", item.get("style", "unknown"))
         pure_periodic = item.get("pure_periodic", False)
         
-        ref_img = np.array(Image.open(ref_path).convert("L"))
-        search_img = np.array(Image.open(search_path).convert("L"))
+        try:
+            ref_img = np.array(Image.open(ref_path).convert("L"))
+            search_img = np.array(Image.open(search_path).convert("L"))
+            
+            # Benchmark single-pair latency
+            t0 = time.perf_counter()
+            (pred_x, pred_y), conf = find_localized_center(ref_img, search_img)
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        except Exception as e:
+            errors.append({"pair_id": item.get("pair_id"), "error": str(e)})
+            print(f"    [!] Skipped pair_id={item.get('pair_id')}: {e}")
+            continue
         
-        # Benchmark single-pair latency
-        t0 = time.perf_counter()
-        (pred_x, pred_y), conf = find_localized_center(ref_img, search_img)
-        elapsed_ms = (time.perf_counter() - t0) * 1000.0
         times.append(elapsed_ms)
         
         err_px = float(np.hypot(pred_x - gt_x, pred_y - gt_y))
@@ -112,6 +119,7 @@ def evaluate_dataset(dataset_dir="./benchmark_dataset", output_dir="./results"):
     
     summary = {
         "total_pairs_evaluated": len(results),
+        "pairs_skipped_due_to_error": len(errors),
         "standard_cases_count": len(std_cases),
         "periodic_stress_cases_count": len(periodic_cases),
         "standard_cases_subpixel_accuracy_pct": round(std_subpixel_acc, 2),
@@ -124,6 +132,8 @@ def evaluate_dataset(dataset_dir="./benchmark_dataset", output_dir="./results"):
     
     print("\n================ BENCHMARK SUMMARY ================")
     print(f"Total Samples Evaluated:            {len(results)}")
+    if errors:
+        print(f"Samples Skipped (errors):           {len(errors)}")
     print(f"Sub-Pixel Success Rate (<=0.5 px):  {std_subpixel_acc:.1f}%")
     print(f"Standard Success Rate (<=1.0 px):   {std_1px_acc:.1f}%")
     print(f"Mean Absolute Error (Standard):     {std_mae_px:.3f} px ({std_mae_nm:.1f} nm)")
@@ -136,6 +146,10 @@ def evaluate_dataset(dataset_dir="./benchmark_dataset", output_dir="./results"):
         
     with open(os.path.join(output_dir, "detailed_results.json"), "w") as f:
         json.dump(results, f, indent=2)
+        
+    if errors:
+        with open(os.path.join(output_dir, "skipped_pairs.json"), "w") as f:
+            json.dump(errors, f, indent=2)
         
     # Generate Visual Diagnostic Plots
     generate_visual_cases(best_case, worst_case, output_dir)
